@@ -131,7 +131,18 @@ public final class MainActivity extends Activity {
         query.setHint("搜索");
         query.setTextSize(18);
         query.setSelectAllOnFocus(false);
-        searchScreen.addView(query, new LinearLayout.LayoutParams(-1, dp(54)));
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        searchScreen.addView(row);
+        row.addView(query, new LinearLayout.LayoutParams(0, dp(54), 1));
+        Button submit = new Button(this);
+        submit.setText("搜索");
+        submit.setTextColor(0xff164b39);
+        submit.setOnClickListener(view -> {
+            String term = query.getText().toString().trim();
+            if (!term.isEmpty()) beginSearch(term);
+        });
+        row.addView(submit);
         query.setOnEditorActionListener((view, action, event) -> {
             if (action != EditorInfo.IME_ACTION_SEARCH &&
                 (event == null || event.getKeyCode() != android.view.KeyEvent.KEYCODE_ENTER)) return false;
@@ -250,73 +261,41 @@ public final class MainActivity extends Activity {
             showSearchMessage("缺少播放配置");
             return;
         }
-        if (searchBrowser == null) {
-            searchBrowser = makeBrowser();
-            searchBrowser.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
-            searchBrowser.setWebViewClient(new PageClient(false));
-            root.addView(searchBrowser, 0, new FrameLayout.LayoutParams(-1, -1));
-        }
-        resultKey = "";
-        waitingForPage = false;
         titles.removeAllViews();
         previous.setVisibility(View.GONE);
         next.setVisibility(View.GONE);
-        showSearchMessage("正在搜索…");
-        searchStarted = SystemClock.uptimeMillis();
-        int request = ++searchRequest;
-        String url = source.buildUpon().path("/search").appendPath(term).build().toString();
-        searchBrowser.loadUrl(url);
-        clock.postDelayed(() -> readResults(request), 250);
+        fetchPage(term, 1);
     }
 
+    private int pageNumber = 1;
+    private final java.util.concurrent.ExecutorService searches = java.util.concurrent.Executors.newCachedThreadPool();
+
     private void turnPage(String direction) {
-        if (searchBrowser == null || waitingForPage) return;
-        waitingForPage = true;
+        fetchPage(lastSearch, pageNumber + ("下一页".equals(direction) ? 1 : -1));
+    }
+
+    private void fetchPage(String term, int page) {
+        int request = ++searchRequest;
         previous.setEnabled(false);
         next.setEnabled(false);
         showSearchMessage("正在搜索…");
-        searchStarted = SystemClock.uptimeMillis();
-        int request = ++searchRequest;
-        searchBrowser.evaluateJavascript("window.__movieTurnPage?.(" + JSONObject.quote(direction) + ")", null);
-        clock.postDelayed(() -> readResults(request), 250);
-    }
-
-    private void readResults(int request) {
-        if (request != searchRequest || searchBrowser == null) return;
-        String target = JSONObject.quote("/search/" + lastSearch);
-        String script = "decodeURIComponent(location.pathname)===" + target + "?(" + searchScript.trim().replaceFirst(";$", "") + "):null";
-        searchBrowser.evaluateJavascript(script, answer -> {
-            if (request != searchRequest || searchBrowser == null) return;
-            long elapsed = SystemClock.uptimeMillis() - searchStarted;
+        searches.execute(() -> {
             try {
-                JSONObject state = new JSONObject(answer);
+                JSONObject state = SearchClient.search(source.toString(), term, page);
                 JSONArray items = state.getJSONArray("items");
-                String key = items.toString();
-                if (items.length() != 0 && (!waitingForPage || !key.equals(resultKey))) {
-                    waitingForPage = false;
-                    resultKey = key;
+                clock.post(() -> {
+                    if (request != searchRequest || isDestroyed()) return;
+                    pageNumber = page;
                     renderResults(items, state);
-                    return;
-                }
-                if (!waitingForPage && state.optBoolean("empty")) {
-                    showSearchMessage("暂无搜索结果");
-                    return;
-                }
-                if (waitingForPage && elapsed > 6500 && items.length() != 0) {
-                    waitingForPage = false;
-                    renderResults(items, state);
-                    return;
-                }
-            } catch (JSONException ignored) {
-                // The results page is still being assembled.
-            }
-            if (elapsed > 18000) {
-                waitingForPage = false;
-                previous.setEnabled(true);
-                next.setEnabled(true);
-                showSearchMessage("暂时没有搜索结果");
-            } else {
-                clock.postDelayed(() -> readResults(request), 350);
+                    if (items.length() == 0) showSearchMessage("没有匹配的标题");
+                });
+            } catch (Exception error) {
+                clock.post(() -> {
+                    if (request != searchRequest || isDestroyed()) return;
+                    previous.setEnabled(true);
+                    next.setEnabled(true);
+                    showSearchMessage("搜索请求失败，请检查网络后重试");
+                });
             }
         });
     }
@@ -518,6 +497,8 @@ public final class MainActivity extends Activity {
 
     @Override protected void onDestroy() {
         if (playerBrowser != null) closePlayer();
+        searchRequest++;
+        searches.shutdownNow();
         clock.removeCallbacksAndMessages(null);
         if (searchBrowser != null) {
             ((ViewGroup) searchBrowser.getParent()).removeView(searchBrowser);

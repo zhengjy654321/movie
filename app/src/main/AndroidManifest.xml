@@ -1,9 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
-    <application android:allowBackup="false" android:label="极简播放"
+    <application android:allowBackup="false" android:label="@string/app_name" android:icon="@drawable/lemon" android:roundIcon="@drawable/lemon"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
-        <activity android:name=".MainActivity" android:exported="true"
+        <activity android:name=".MainActivity" android:label="@string/app_name" android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>

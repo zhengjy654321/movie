@@ -30,7 +30,7 @@ jobs:
           gradle --no-daemon :app:assembleRelease
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release-unsigned.apk dist/movie-unsigned.apk
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging dist/movie-unsigned.apk | grep -F "package: name='com.jiyu.movie' versionCode='1'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging dist/movie-unsigned.apk | grep -F "package: name='com.jiyu.movie' versionCode='2'"
       - uses: actions/upload-artifact@v4
         with:
           name: movie-android

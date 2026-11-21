@@ -1,0 +1,38 @@
+name: Build Android APK
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platforms;android-35 build-tools;35.0.0
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Test playback state
+        run: node --test tests/player.test.cjs
+      - name: Build APK
+        run: |
+          gradle --no-daemon :app:assembleRelease
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release-unsigned.apk dist/movie-unsigned.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging dist/movie-unsigned.apk | grep -F "package: name='com.jiyu.movie' versionCode='1'"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: movie-android
+          path: dist/movie-unsigned.apk
+          if-no-files-found: error

@@ -53,7 +53,6 @@ public final class MainActivity extends Activity {
     private FrameLayout playback;
     private TextView loading;
     private TextView fullscreenMask;
-    private Button coverButton;
     private View fullscreen;
     private WebChromeClient.CustomViewCallback fullscreenCallback;
     private Uri source;
@@ -438,19 +437,10 @@ public final class MainActivity extends Activity {
         playerBrowser.setWebChromeClient(new PlayerChrome());
         playback.addView(playerBrowser, new FrameLayout.LayoutParams(-1, -1));
 
-        coverButton = new Button(this);
-        coverButton.setText("遮挡");
-        coverButton.setTextSize(12);
-        coverButton.setVisibility(View.GONE);
-        coverButton.setOnClickListener(view -> toggleCover());
-        FrameLayout.LayoutParams buttonLayout = new FrameLayout.LayoutParams(-2, -2, Gravity.END | Gravity.TOP);
-        buttonLayout.setMargins(dp(8), dp(5), dp(8), dp(5));
-        playback.addView(coverButton, buttonLayout);
-        Button nodes = new Button(this);
-        nodes.setText("节点");
-        nodes.setOnClickListener(v -> nodeSettings());
-        playback.addView(nodes,new FrameLayout.LayoutParams(-2,-2,Gravity.START | Gravity.TOP));
-
+        playerBrowser.setOnLongClickListener(view -> {
+            toggleCover();
+            return true;
+        });
         loading = blackCover();
         playback.addView(loading, new FrameLayout.LayoutParams(-1, -1));
         playerStarted = SystemClock.uptimeMillis();
@@ -462,9 +452,7 @@ public final class MainActivity extends Activity {
     private void toggleCover() {
         if (playerBrowser == null) return;
         playerBrowser.evaluateJavascript("window.__moviePlayer?.manual()", answer -> {
-            if (coverButton == null) return;
             playbackManual = "true".equals(answer);
-            coverButton.setText(playbackManual ? "取消遮挡" : "遮挡");
         });
     }
 
@@ -480,7 +468,6 @@ public final class MainActivity extends Activity {
                 JSONObject state = new JSONObject(answer);
                 playbackAd = state.optBoolean("ad");
                 playbackManual = state.optBoolean("manual");
-                coverButton.setText(playbackManual ? "取消遮挡" : "遮挡");
                 updateFullscreenMask();
                 if (state.optBoolean("ready") && !playerRevealed && !revealRequested) {
                     revealRequested = true;
@@ -490,7 +477,6 @@ public final class MainActivity extends Activity {
                             if (request != playerRequest || id != visualRevision || loading == null) return;
                             playerRevealed = true;
                             loading.setVisibility(View.GONE);
-                            coverButton.setVisibility(View.VISIBLE);
                         }
                     });
                 }
@@ -554,7 +540,6 @@ public final class MainActivity extends Activity {
         root.removeView(playback);
         playerBrowser = null;
         playback = null;
-        coverButton = null;
         loading = null;
         playbackAd = playbackManual = revealRequested = playerRevealed = false;
         searchScreen.setVisibility(View.VISIBLE);

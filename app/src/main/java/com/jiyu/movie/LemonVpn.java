@@ -72,7 +72,7 @@ public final class LemonVpn extends VpnService {
         }
         if (url == null || !url.startsWith("https://")) throw new IOException("Invalid subscription");
         String config = "mode: rule\nlog-level: silent\nipv6: true\nproxy-providers:\n  subscription:\n    type: http\n    url: "
-            + JSONObject.quote(url) + "\n    path: nodes.yaml\n    interval: 86400\n    health-check:\n      enable: true\n      lazy: false\n      url: https://www.gstatic.com/generate_204\n      interval: 300\n"
+            + "'" + url.replace("'", "''") + "'" + "\n    path: nodes.yaml\n    interval: 86400\n    health-check:\n      enable: true\n      lazy: false\n      url: https://www.gstatic.com/generate_204\n      interval: 300\n"
             + "proxy-groups:\n  - name: LEMON-AUTO\n    type: url-test\n    use: [subscription]\n    url: https://www.gstatic.com/generate_204\n    interval: 300\n    tolerance: 60\n"
             + "  - name: LEMON-SELECT\n    type: select\n    proxies: [LEMON-AUTO]\n    use: [subscription]\nrules:\n  - MATCH,LEMON-SELECT\n";
         Files.write(new File(home,"config.yaml").toPath(),config.getBytes(StandardCharsets.UTF_8));

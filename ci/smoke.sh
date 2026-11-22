@@ -21,5 +21,8 @@ for i in $(seq 1 65); do
     if [[ "$logs" == *FAILED* ]]; then break; fi
     sleep 2
 done
-adb logcat -d -s LemonSmoke AndroidRuntime GoLog Clash | tail -100
+cat "$RUNNER_TEMP/fixture.log" | head -c 3000
+adb shell dumpsys activity services com.jiyu.movie | head -60
+adb shell dumpsys activity activities | grep mResumedActivity || true
+adb logcat -d | grep -E "LemonSmoke|AndroidRuntime|F DEBUG|panic:|VpnManagerService|GoLog|UnsatisfiedLinkError" | tail -150
 exit 1

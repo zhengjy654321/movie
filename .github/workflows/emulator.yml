@@ -20,6 +20,9 @@ jobs:
           bash ci/core.sh
           rm -rf app/src/main/jniLibs/{arm64-v8a,armeabi-v7a,x86}
           sed -i 's/!url.startsWith("https:\/\/")/!url.equals("http:\/\/10.0.2.2:18980\/nodes.yaml")/' app/src/main/java/com/jiyu/movie/LemonVpn.java
+          sed -i '/status = "连接失败/i\                android.util.Log.e("LemonSmoke","Core startup",failure);' app/src/main/java/com/jiyu/movie/LemonVpn.java
+          sed -i 's/new IOException("Configuration unavailable")/new IOException("Configuration unavailable",error.get())/' app/src/main/java/com/jiyu/movie/LemonVpn.java
+          sed -i '/nodes = usable;/a\        android.util.Log.i("LemonSmoke","Nodes: " + usable.length());' app/src/main/java/com/jiyu/movie/LemonVpn.java
           printf 'http://10.0.2.2:18980/nodes.yaml' > app/src/main/assets/subscription.txt
           gradle --no-daemon --stacktrace -Dorg.gradle.jvmargs=-Xmx3g :app:assembleDebug
       - name: Enable KVM

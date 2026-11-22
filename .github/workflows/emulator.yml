@@ -1,0 +1,32 @@
+name: Android tunnel smoke test
+on: [push]
+permissions:
+  contents: read
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Build isolated test APK
+        run: |
+          bash ci/core.sh
+          sed -i 's/!url.startsWith("https:\/\/")/!url.equals("http:\/\/10.0.2.2:18980\/nodes.yaml")/' app/src/main/java/com/jiyu/movie/LemonVpn.java
+          printf 'http://10.0.2.2:18980/nodes.yaml' > app/src/main/assets/subscription.txt
+          gradle --no-daemon :app:assembleDebug
+      - name: Enable KVM
+        run: sudo chmod 666 /dev/kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: bash ci/smoke.sh

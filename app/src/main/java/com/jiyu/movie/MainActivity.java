@@ -112,12 +112,16 @@ public final class MainActivity extends Activity {
     }
 
     private boolean requestingVpn;
-    private boolean automaticStart = true;
+    private boolean declinedVpn;
 
     @Override protected void onStart() {
         super.onStart();
-        if (automaticStart) connectNodes();
-        automaticStart = true;
+        if (!declinedVpn && !requestingVpn) connectNodes();
+    }
+
+    @Override protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        if (!declinedVpn && !requestingVpn) connectNodes();
     }
 
     private void connectNodes() {
@@ -125,7 +129,6 @@ public final class MainActivity extends Activity {
         if (consent != null) {
             if (!requestingVpn) {
                 requestingVpn = true;
-                automaticStart = false;
                 startActivityForResult(consent, 173);
             }
         } else {
@@ -137,6 +140,7 @@ public final class MainActivity extends Activity {
         super.onActivityResult(request,result,data);
         if (request == 173) {
             requestingVpn = false;
+            declinedVpn = result != RESULT_OK;
             if (result == RESULT_OK) startForegroundService(new android.content.Intent(this,LemonVpn.class));
             else showSearchMessage("需要 VPN 授权，可在设置中重试");
         }

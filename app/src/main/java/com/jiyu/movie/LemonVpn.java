@@ -134,11 +134,35 @@ public final class LemonVpn extends VpnService {
         core.nativeUpdateProvider(pending,"Proxy",SOURCE);
     }
 
+    static void readNodes(java.util.function.Consumer<JSONArray> callback) {
+        worker.execute(() -> {
+            JSONArray result = nodes;
+            if (connected) {
+                try {
+                    JSONArray fresh = new JSONObject(core.nativeQueryGroup(SELECT,"Default")).getJSONArray("proxies");
+                    JSONArray available = new JSONArray();
+                    for (int i=0;i<fresh.length();i++) {
+                        JSONObject node = fresh.getJSONObject(i);
+                        if (!"COMPATIBLE".equalsIgnoreCase(node.optString("name"))) available.put(node);
+                    }
+                    result = available;
+                } catch (Exception ignored) {}
+            }
+            JSONArray snapshot = result;
+            new Handler(Looper.getMainLooper()).post(() -> callback.accept(snapshot));
+        });
+    }
+
     static void choose(Context context,String name,java.util.function.Consumer<Boolean> callback) {
         worker.execute(() -> {
-            boolean ok = connected && core.nativePatchSelector(SELECT,name);
+            boolean ok = false;
+            if (connected && core.nativePatchSelector(SELECT,name)) {
+                try { ok = name.equals(new JSONObject(core.nativeQueryGroup(SELECT,"Default")).optString("now")); }
+                catch (Exception ignored) {}
+            }
             if (ok) context.getSharedPreferences("nodes",0).edit().putString("choice",name).apply();
-            new Handler(Looper.getMainLooper()).post(() -> callback.accept(ok));
+            boolean selected = ok;
+            new Handler(Looper.getMainLooper()).post(() -> callback.accept(selected));
         });
     }
 

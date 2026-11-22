@@ -144,31 +144,51 @@ public final class MainActivity extends Activity {
     }
 
     private void nodeSettings() {
-        JSONArray list = LemonVpn.nodes;
-        String selected = getSharedPreferences("nodes",0).getString("choice",LemonVpn.AUTO);
-        String[] labels = new String[list.length()];
-        String[] names = new String[list.length()];
-        int checked = -1;
-        for (int i=0;i<names.length;i++) {
-            JSONObject item = list.optJSONObject(i);
-            names[i] = item.optString("name");
-            String title = names[i].equals(LemonVpn.AUTO) ? "自动选择" : names[i];
-            int delay = item.optInt("delay");
-            labels[i] = title + (delay > 0 && delay < 65535 ? " · " + delay + " ms" : "");
-            if (names[i].equals(selected)) checked=i;
-        }
-        android.app.AlertDialog.Builder dialog = new android.app.AlertDialog.Builder(this)
-            .setTitle("节点 · " + LemonVpn.status)
-            .setNegativeButton("关闭",null)
-            .setNeutralButton("刷新订阅",(d,w) -> connectNodes());
-        if (names.length==0) dialog.setMessage("节点列表尚未就绪。");
-        else dialog.setSingleChoiceItems(labels,checked,(d,index) -> {
-            d.dismiss();
-            if (names[index].equals(selected)) return;
-            LemonVpn.choose(this,names[index],ok ->
-                android.widget.Toast.makeText(this,ok ? "已切换节点" : "切换失败，请重试",0).show());
+        android.widget.ListView rows = new android.widget.ListView(this);
+        rows.setChoiceMode(android.widget.ListView.CHOICE_MODE_SINGLE);
+        android.widget.ArrayAdapter<String> items = new android.widget.ArrayAdapter<>(this,
+            android.R.layout.simple_list_item_single_choice);
+        rows.setAdapter(items);
+        java.util.ArrayList<String> names = new java.util.ArrayList<>();
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(this)
+            .setTitle("节点 · " + LemonVpn.status).setView(rows)
+            .setNegativeButton("关闭",null).setNeutralButton("刷新订阅",null).create();
+        rows.setOnItemClickListener((parent,view,index,id) -> {
+            String name = names.get(index);
+            dialog.dismiss();
+            if (!name.equals(getSharedPreferences("nodes",0).getString("choice",LemonVpn.AUTO)))
+                LemonVpn.choose(this,name,ok -> android.widget.Toast.makeText(this,
+                    ok ? "已切换节点" : "切换失败，请重试",0).show());
         });
         dialog.show();
+        dialog.getButton(-3).setOnClickListener(v -> connectNodes());
+        Runnable update = new Runnable() {
+            public void run() {
+                if (!dialog.isShowing()) return;
+                LemonVpn.readNodes(list -> {
+                    if (!dialog.isShowing()) return;
+                    dialog.setTitle("节点 · " + LemonVpn.status);
+                    String selected = getSharedPreferences("nodes",0).getString("choice",LemonVpn.AUTO);
+                    java.util.ArrayList<String> labels = new java.util.ArrayList<>();
+                    names.clear();
+                    for (int i=0;i<list.length();i++) {
+                        JSONObject node=list.optJSONObject(i);
+                        String name=node.optString("name");
+                        names.add(name);
+                        int delay=node.optInt("delay");
+                        labels.add((LemonVpn.AUTO.equals(name) ? "自动选择" : name)
+                            + (delay>0 && delay<65535 ? " · "+delay+" ms" : ""));
+                    }
+                    boolean changed = labels.size()!=items.getCount();
+                    for (int i=0;!changed && i<labels.size();i++) changed=!labels.get(i).equals(items.getItem(i));
+                    if (changed) { items.clear(); items.addAll(labels); }
+                    int checked=names.indexOf(selected);
+                    if (checked>=0) rows.setItemChecked(checked,true);
+                    rows.postDelayed(this,1500);
+                });
+            }
+        };
+        update.run();
     }
 
     private int dp(int n) {

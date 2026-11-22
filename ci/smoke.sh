@@ -24,5 +24,5 @@ done
 cat "$RUNNER_TEMP/fixture.log" | head -c 3000
 adb shell dumpsys activity services com.jiyu.movie | head -60
 adb shell dumpsys activity activities | grep mResumedActivity || true
-adb logcat -d | grep -E "LemonSmoke|AndroidRuntime|F DEBUG|panic:|VpnManagerService|GoLog|UnsatisfiedLinkError" | tail -150
+adb logcat -d | grep -E "LemonSmoke|AndroidRuntime|F DEBUG|panic:|VpnManagerService|GoLog|ClashMetaForAndroid|UnsatisfiedLinkError" | tail -150
 exit 1

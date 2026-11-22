@@ -112,6 +112,65 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private boolean requestingVpn;
+    private boolean automaticStart = true;
+
+    @Override protected void onStart() {
+        super.onStart();
+        if (automaticStart) connectNodes();
+        automaticStart = true;
+    }
+
+    private void connectNodes() {
+        android.content.Intent consent = android.net.VpnService.prepare(this);
+        if (consent != null) {
+            if (!requestingVpn) {
+                requestingVpn = true;
+                automaticStart = false;
+                startActivityForResult(consent, 173);
+            }
+        } else {
+            startForegroundService(new android.content.Intent(this,LemonVpn.class));
+        }
+    }
+
+    @Override protected void onActivityResult(int request, int result, android.content.Intent data) {
+        super.onActivityResult(request,result,data);
+        if (request == 173) {
+            requestingVpn = false;
+            if (result == RESULT_OK) startForegroundService(new android.content.Intent(this,LemonVpn.class));
+            else showSearchMessage("需要 VPN 授权，可在设置中重试");
+        }
+    }
+
+    private void nodeSettings() {
+        JSONArray list = LemonVpn.nodes;
+        String selected = getSharedPreferences("nodes",0).getString("choice",LemonVpn.AUTO);
+        String[] labels = new String[list.length()];
+        String[] names = new String[list.length()];
+        int checked = -1;
+        for (int i=0;i<names.length;i++) {
+            JSONObject item = list.optJSONObject(i);
+            names[i] = item.optString("name");
+            String title = names[i].equals(LemonVpn.AUTO) ? "自动选择" : names[i];
+            int delay = item.optInt("delay");
+            labels[i] = title + (delay > 0 && delay < 65535 ? " · " + delay + " ms" : "");
+            if (names[i].equals(selected)) checked=i;
+        }
+        android.app.AlertDialog.Builder dialog = new android.app.AlertDialog.Builder(this)
+            .setTitle("节点 · " + LemonVpn.status)
+            .setNegativeButton("关闭",null)
+            .setNeutralButton("刷新订阅",(d,w) -> connectNodes());
+        if (names.length==0) dialog.setMessage("节点列表尚未就绪。");
+        else dialog.setSingleChoiceItems(labels,checked,(d,index) -> {
+            d.dismiss();
+            if (names[index].equals(selected)) return;
+            LemonVpn.choose(this,names[index],ok ->
+                android.widget.Toast.makeText(this,ok ? "已切换节点" : "切换失败，请重试",0).show());
+        });
+        dialog.show();
+    }
+
     private int dp(int n) {
         return Math.round(n * getResources().getDisplayMetrics().density);
     }
@@ -143,6 +202,10 @@ public final class MainActivity extends Activity {
             if (!term.isEmpty()) beginSearch(term);
         });
         row.addView(submit);
+        Button settings = new Button(this);
+        settings.setText("设置");
+        settings.setOnClickListener(v -> nodeSettings());
+        row.addView(settings);
         query.setOnEditorActionListener((view, action, event) -> {
             if (action != EditorInfo.IME_ACTION_SEARCH &&
                 (event == null || event.getKeyCode() != android.view.KeyEvent.KEYCODE_ENTER)) return false;
@@ -254,6 +317,7 @@ public final class MainActivity extends Activity {
     }
 
     private void beginSearch(String term) {
+        if (!LemonVpn.connected) { showSearchMessage("节点尚未连接，请稍后搜索或打开设置"); return; }
         lastSearch = term;
         ((InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE))
             .hideSoftInputFromWindow(query.getWindowToken(), 0);
@@ -340,6 +404,7 @@ public final class MainActivity extends Activity {
 
     private void openPlayer(Uri url) {
         if (playerBrowser != null) return;
+        if (!LemonVpn.connected) { showSearchMessage("节点尚未连接"); return; }
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         getWindow().setStatusBarColor(Color.BLACK);
         getWindow().setNavigationBarColor(Color.BLACK);
@@ -361,6 +426,10 @@ public final class MainActivity extends Activity {
         FrameLayout.LayoutParams buttonLayout = new FrameLayout.LayoutParams(-2, -2, Gravity.END | Gravity.TOP);
         buttonLayout.setMargins(dp(8), dp(5), dp(8), dp(5));
         playback.addView(coverButton, buttonLayout);
+        Button nodes = new Button(this);
+        nodes.setText("节点");
+        nodes.setOnClickListener(v -> nodeSettings());
+        playback.addView(nodes,new FrameLayout.LayoutParams(-2,-2,Gravity.START | Gravity.TOP));
 
         loading = blackCover();
         playback.addView(loading, new FrameLayout.LayoutParams(-1, -1));

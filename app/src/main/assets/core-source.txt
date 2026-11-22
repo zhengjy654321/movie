@@ -1,0 +1,3 @@
+ClashMetaForAndroid v2.11.37 — GPL-3.0
+https://github.com/MetaCubeX/ClashMetaForAndroid/tree/v2.11.37
+Android integration source: https://github.com/zhengjy654321/movie

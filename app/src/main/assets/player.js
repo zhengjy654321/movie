@@ -19,6 +19,7 @@
       inset: auto !important; transform: none !important; margin: 0 !important;
       width: 100% !important; height: 100% !important; }
     [data-movie-player] vg-player { width: 100% !important; height: 100% !important; }
+    [data-movie-player] vg-pause-f, [data-movie-player] vg-overlay-play .pause-ad,
     [data-movie-player] .player-title-bar, [data-movie-player] vg-overlay-danmu,
     [data-movie-player] [id="coin-or-upgrade-to-skip-ad"], [data-movie-player] .quanlityDiv {
       display: none !important;

@@ -2,8 +2,6 @@ name: Build Android APK
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,14 +23,23 @@ jobs:
           gradle-version: '8.11.1'
       - name: Test playback state
         run: node --test tests/player.test.cjs
+      - name: Prepare native engine
+        run: bash ci/core.sh
+      - name: Set subscription
+        env:
+          SUBSCRIPTION_URL: ${{ secrets.SUBSCRIPTION_URL }}
+        run: |
+          test -n "$SUBSCRIPTION_URL" || { echo "Missing subscription secret"; exit 1; }
+          umask 077
+          printf '%s' "$SUBSCRIPTION_URL" > app/src/main/assets/subscription.txt
       - name: Build APK
         run: |
           gradle --no-daemon :app:assembleRelease
           mkdir -p dist
-          cp app/build/outputs/apk/release/app-release-unsigned.apk dist/movie-unsigned.apk
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging dist/movie-unsigned.apk | grep -F "package: name='com.jiyu.movie' versionCode='2'"
+          openssl cms -encrypt -binary -aes-256-cbc -outform DER -in app/build/outputs/apk/release/app-release-unsigned.apk -out dist/movie.apk.cms ci/transport.pem
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/release/app-release-unsigned.apk | grep -F "package: name='com.jiyu.movie' versionCode='3'"
       - uses: actions/upload-artifact@v4
         with:
           name: movie-android
-          path: dist/movie-unsigned.apk
+          path: dist/movie.apk.cms
           if-no-files-found: error

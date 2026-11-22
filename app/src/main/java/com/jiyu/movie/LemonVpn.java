@@ -24,6 +24,8 @@ public final class LemonVpn extends VpnService {
     static volatile JSONArray nodes = new JSONArray();
     private static Bridge core;
     private boolean running;
+    private boolean refreshing;
+    private static ParcelFileDescriptor applicationArchive;
     private volatile boolean closing;
 
     @Override public int onStartCommand(Intent intent, int flags, int id) {
@@ -60,6 +62,7 @@ public final class LemonVpn extends VpnService {
         File home = new File(getFilesDir(),"network");
         Files.createDirectories(home.toPath());
         if (core == null) {
+            applicationArchive = ParcelFileDescriptor.open(new File(getPackageCodePath()), ParcelFileDescriptor.MODE_READ_ONLY);
             core = new Bridge();
             core.nativeInit(home.getAbsolutePath(),"1.2.0",Build.VERSION.SDK_INT);
         }
@@ -111,12 +114,24 @@ public final class LemonVpn extends VpnService {
     }
 
     private void refreshSubscription() {
-        try {
-            await(result -> core.nativeUpdateProvider(result,"Proxy",SOURCE));
-            if (!closing) { updateList(); core.nativeHealthCheckAll(); }
-        } catch (Exception ignored) {
-            status = connected ? "已连接，上次的节点列表仍可用" : "订阅刷新失败，可重试";
-        }
+        if (refreshing || closing) return;
+        refreshing = true;
+        CompletableDeferred<Unit> pending = CompletableDeferredKt.CompletableDeferred((Job)null);
+        pending.invokeOnCompletion(cause -> {
+            worker.execute(() -> {
+                refreshing = false;
+                if (closing) return;
+                try {
+                    if (cause != null) throw new IOException("Update failed");
+                    updateList();
+                    core.nativeHealthCheckAll();
+                } catch (Exception failure) {
+                    status = connected ? "已连接，上次的节点列表仍可用" : "订阅刷新失败，可重试";
+                }
+            });
+            return Unit.INSTANCE;
+        });
+        core.nativeUpdateProvider(pending,"Proxy",SOURCE);
     }
 
     static void choose(Context context,String name,java.util.function.Consumer<Boolean> callback) {

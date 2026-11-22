@@ -18,9 +18,10 @@ jobs:
       - name: Build isolated test APK
         run: |
           bash ci/core.sh
+          rm -rf app/src/main/jniLibs/{arm64-v8a,armeabi-v7a,x86}
           sed -i 's/!url.startsWith("https:\/\/")/!url.equals("http:\/\/10.0.2.2:18980\/nodes.yaml")/' app/src/main/java/com/jiyu/movie/LemonVpn.java
           printf 'http://10.0.2.2:18980/nodes.yaml' > app/src/main/assets/subscription.txt
-          gradle --no-daemon :app:assembleDebug
+          gradle --no-daemon --stacktrace -Dorg.gradle.jvmargs=-Xmx3g :app:assembleDebug
       - name: Enable KVM
         run: sudo chmod 666 /dev/kvm
       - uses: reactivecircus/android-emulator-runner@v2
